@@ -13,12 +13,13 @@ typedef struct thread_arg{
 typedef struct slotElem{
 	char* filename;
 	uint64_t number;
+	struct slotElem* next;
 } slotElem;
 
 //represente un fichier d'entree
 typedef struct entry{
 	char* file;
-	 struct entry* next;
+	struct entry* next;
 }entry;
 
 /**
@@ -29,6 +30,14 @@ typedef struct entry{
  * @return: 0 si ok, un autre nombre sinon (contenu dans errno)
  **/ 
 int pushEntry(entry** list, char* file);
+
+/**
+ * popEntry
+ * retourne la premiere entree contenue dans list
+ * @param:list, la liste d'entree a modifier
+ * @return: l'entree qui vient d'etre enlevee a la liste, NULL si liste vide
+ **/ 
+char* popEntry(entry** list);
 
 
 /**

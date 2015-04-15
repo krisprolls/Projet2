@@ -8,44 +8,43 @@
 #include <inttypes.h>
 #include "mainHeader.h"
 
-//define pour main
-#define ALT_PRODUCER 0
-#define ALT_CONSUMER 1
+//constantes options
+#define MAX_THREADS_TK "-maxthreads"
+#define STDIN_TK "-stdin"
+#define FILE_TK "file"
+#define URL_TK  "http://"
 
 #define STDIN_ENTRY 0
 #define FILE_ENTRY 1
 #define SHAREDFILE_ENTRY 2 
 
 
+
+
 int main(int argc, char **argv)
 {
 	int stdIn = 0; //stdIn pas utilise
 	entry* listOfEntries = NULL;
-	int maxthreads, i;
+	int maxThreads, i;
 	int entriesNumber = 0;
 	
-	//constante options
-	const char* maxThreadsTk = "-maxthreads";
-	const char* stdInTk = "-stdin";
-	const char* fileTk = "file";
-	const char* urlTk = "http://";
 	
 	//Parcoure tous les arguments de lancement du programme
 	for(i = 1; i < argc; i++){
 		char* in = argv[i];
-		if(strcmp(in, maxThreadsTk) == 0){ //maxthreads
-			maxthreads = atoi(argv[i+1]);
+		if(strcmp(in, MAX_THREADS_TK) == 0){ //maxthreads
+			maxThreads = atoi(argv[i+1]);
 			i++;
 			//on passe 2 arguments puisqu'on a deja utilise le nombre
 			// de threads max
-			printf("Maxthreads set to %d\n",maxthreads);
+			printf("Maxthreads set to %d\n",maxThreads);
 		}
-		else if (strcmp(in, stdInTk) == 0){ //stdIn
+		else if (strcmp(in, STDIN_TK) == 0){ //stdIn
 			stdIn = 1; // stdIn utilise
 			entriesNumber++;
 			printf("Stdin set \n");
 		}
-		else if (strcmp(in, fileTk) == 0){ //fichier
+		else if (strcmp(in, FILE_TK) == 0){ //fichier
 			if(pushEntry(&listOfEntries, argv[i+1]) != 0){
 				//probleme de malloc, arrete le programme
 				exit(errno);
@@ -56,7 +55,7 @@ int main(int argc, char **argv)
 				entriesNumber++;
 			}
 		}
-		else if(strstr(in, urlTk) != NULL){ //URL
+		else if(strstr(in, URL_TK) != NULL){ //URL
 			if(pushEntry(&listOfEntries, argv[i]) != 0){
 				//probleme de malloc, arrete le programme
 				exit(errno);
@@ -74,12 +73,86 @@ int main(int argc, char **argv)
 	
 	printf("Number of entries %d\n", entriesNumber);
 	
+	
+	
+	if(maxThreads == 0){ /// a voir
+		maxThreads = 10;
+		printf("maxthread was 0, assigned to %d\n", maxThreads);
+	}
+	
+	const int ALT_PRODUCER = 1;
+	const int ALT_CONSUMER = 0;
 	int alternator = ALT_PRODUCER;
 	//lance les threads alternativement (producteur, consommateur,
 	// producteur...)
-	while(entriesNumber > 0){
-			///TODO complete the thread launching phase here
-	}
+	pthread_t threads[maxThreads];
+	int threadIndex;
+	
+	for(threadIndex = 0; threadIndex < maxThreads; threadIndex++){
+	//lance tous les threads	
+	
+		if(alternator == ALT_PRODUCER && entriesNumber > 0){
+			//mode producteur
+			
+			thread_arg t_arg;
+			if(stdIn == 1){ 
+				//on traite toujoours stdin en premier, cela permet
+				//a l'utilisateur de ne pas attendre un thread disponible 
+				//pour les entrees via la console
+				t_arg.file = NULL;
+				t_arg.fileType =  STDIN_ENTRY;
+				t_arg.threadIndex =  threadIndex;
+				stdIn = 0;
+				entriesNumber--;
+				printf("stdIn bien lance\n");		
+			}
+			
+			else{
+				char* file = popEntry(&listOfEntries);
+				
+				if(file != NULL){					
+					if(strstr(file, URL_TK) != NULL){ //fichier URL
+						t_arg.file = NULL;
+						t_arg.fileType =  SHAREDFILE_ENTRY;
+						t_arg.threadIndex = threadIndex;
+					}
+					else {//fichier normal
+						t_arg.file = NULL;
+						t_arg.fileType = FILE_ENTRY;
+						t_arg.threadIndex = threadIndex;
+					}
+					//lance le thread
+					if(pthread_create(&threads[threadIndex], NULL, &threadLauncher, &t_arg)){
+						fprintf(stderr, "Error creating thread: %d\n", errno);
+						exit(errno);
+					}	
+					entriesNumber--;
+					printf("file bien lance\n");
+				} 
+				
+				else { //erreur de popEntry
+					fprintf(stderr, "Erreur, plus de fichier a traiter\n");
+				}
+			}	
+			
+			//passe en mode consommateur pour le prochain thread
+			
+			alternator = ALT_CONSUMER;
+		}	
+		else {
+			//mode consommateur
+			//lance le thread
+			if(pthread_create(&threads[threadIndex], NULL, &threadLauncher, NULL)){
+				fprintf(stderr, "Error creating thread: %d\n", errno);
+				exit(errno);
+			}
+			//passe en mode producteur pour le prochain thread
+			printf("consommateur bien lance\n");
+			alternator = ALT_PRODUCER;
+		}
+	}// fin du for qui lance tous les threads
+	
+	
 	
 	return 0;
 }
@@ -120,6 +193,27 @@ int pushEntry(entry** list, char* file){
 			
 	}
 	return 0;
+}
+
+/**
+ * popEntry
+ * retourne la premiere entree contenue dans list
+ * @param:list, la liste d'entree a modifier
+ * @return: l'entree qui vient d'etre enlevee a la liste, NULL si liste vide
+ **/ 
+char* popEntry(entry** list){
+	if (*list == NULL){
+		fprintf(stderr, "Liste vide! \n");
+		return NULL;
+	}
+	else{
+		entry* tmp = *list;
+		*list = (*list) -> next;
+		char* retVal = tmp -> file;
+		free(tmp);
+		tmp = NULL;
+		return retVal;
+	}
 }
 
 
@@ -195,7 +289,7 @@ void readStdin(){
 	const char* STDIN = "stdIn";
 	const char* END = "Souhaitez-vous terminer le traitement via l'entree standard? Y/N \n";
 	printf("Vous avez choisi d'utiliser l'entree standard, veuillez entrer les nombres que vous desirez traiter\n");
-	printf(END);
+	printf("%s", END);
 	int end = 0;
 	while(end == 0){
 		char e;
@@ -204,10 +298,10 @@ void readStdin(){
 			uint64_t bEndian;
 			scanf("%" PRIu64",", &bEndian);
 			bEndian = be64toh(bEndian);
-			slotElem tmp = {filename, bEndian};
+			slotElem tmp = {"stdIn", bEndian};
 			///add to slots + mutex
 			printf("Nombre traite!\n");
-			printf(END);
+			printf("%s", END);
 		}
 		else{
 			end++;

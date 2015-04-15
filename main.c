@@ -18,17 +18,16 @@
 #define FILE_ENTRY 1
 #define SHAREDFILE_ENTRY 2 
 
+pthread_t* threads; //threads utilises
 
-
-
-int main(int argc, char **argv)
-{
-	int stdIn = 0; //stdIn pas utilise
-	entry* listOfEntries = NULL;
-	int maxThreads, i;
+int main(int argc, char **argv){	
 	int entriesNumber = 0;
+	int stdIn = 0;//stdIn pas utilise
+	entry* listOfEntries = NULL;// liste des entrees a traiter
+	int maxThreads = 0;
 	
 	
+	int  i;
 	//Parcoure tous les arguments de lancement du programme
 	for(i = 1; i < argc; i++){
 		char* in = argv[i];
@@ -79,81 +78,14 @@ int main(int argc, char **argv)
 		maxThreads = 10;
 		printf("maxthread was 0, assigned to %d\n", maxThreads);
 	}
-	
-	const int ALT_PRODUCER = 1;
-	const int ALT_CONSUMER = 0;
-	int alternator = ALT_PRODUCER;
-	//lance les threads alternativement (producteur, consommateur,
-	// producteur...)
-	pthread_t threads[maxThreads];
-	int threadIndex;
-	
-	for(threadIndex = 0; threadIndex < maxThreads; threadIndex++){
-	//lance tous les threads	
-	
-		if(alternator == ALT_PRODUCER && entriesNumber > 0){
-			//mode producteur
-			
-			thread_arg t_arg;
-			if(stdIn == 1){ 
-				//on traite toujoours stdin en premier, cela permet
-				//a l'utilisateur de ne pas attendre un thread disponible 
-				//pour les entrees via la console
-				t_arg.file = NULL;
-				t_arg.fileType =  STDIN_ENTRY;
-				t_arg.threadIndex =  threadIndex;
-				stdIn = 0;
-				entriesNumber--;
-				printf("stdIn bien lance\n");		
-			}
-			
-			else{
-				char* file = popEntry(&listOfEntries);
-				
-				if(file != NULL){					
-					if(strstr(file, URL_TK) != NULL){ //fichier URL
-						t_arg.file = NULL;
-						t_arg.fileType =  SHAREDFILE_ENTRY;
-						t_arg.threadIndex = threadIndex;
-					}
-					else {//fichier normal
-						t_arg.file = NULL;
-						t_arg.fileType = FILE_ENTRY;
-						t_arg.threadIndex = threadIndex;
-					}
-					//lance le thread
-					if(pthread_create(&threads[threadIndex], NULL, &threadLauncher, &t_arg)){
-						fprintf(stderr, "Error creating thread: %d\n", errno);
-						exit(errno);
-					}	
-					entriesNumber--;
-					printf("file bien lance\n");
-				} 
-				
-				else { //erreur de popEntry
-					fprintf(stderr, "Erreur, plus de fichier a traiter\n");
-				}
-			}	
-			
-			//passe en mode consommateur pour le prochain thread
-			
-			alternator = ALT_CONSUMER;
-		}	
-		else {
-			//mode consommateur
-			//lance le thread
-			if(pthread_create(&threads[threadIndex], NULL, &threadLauncher, NULL)){
-				fprintf(stderr, "Error creating thread: %d\n", errno);
-				exit(errno);
-			}
-			//passe en mode producteur pour le prochain thread
-			printf("consommateur bien lance\n");
-			alternator = ALT_PRODUCER;
-		}
-	}// fin du for qui lance tous les threads
-	
-	
-	
+	threads = (pthread_t*) malloc(sizeof(pthread_t) * maxThreads);
+	//lance tous les threads
+	int err = launchAllThreads(maxThreads, &stdIn, &entriesNumber, &listOfEntries);
+	if(err){
+		fprintf(stderr, "Erreur dans launchAllThreads: %d\n", err);
+	}
+		
+	free(threads); //ne pas oublier !	
 	return 0;
 }
 
@@ -216,6 +148,94 @@ char* popEntry(entry** list){
 	}
 }
 
+
+
+/**
+ * launchAllThreads
+ * Cette fonction lance maxthreads threads en alternant entre producteur
+ * et consommteur
+ * @param: maxThreads, nombre max de threads a lancer
+ * @param: stdIn, pointeur vers un entier indiquant si l'entree standard
+ * est utilisee
+ * @param: entriesNumber, pointeur vers un entier indiquant le nombre
+ * d'entree restant a traiter
+ * @param: listOfEntries, pointeur vers une liste contenant les fichiers
+ * d'entree
+ * @return: 0 si pas d'erreur, valeur differente de 0 sinon
+ **/ 
+ int launchAllThreads(int maxThreads, int* stdIn, int* entriesNumber, entry** listOfEntries){
+	const int ALT_PRODUCER = 1;
+	const int ALT_CONSUMER = 0;
+	int alternator = ALT_PRODUCER;
+	//lance les threads alternativement (producteur, consommateur,
+	// producteur...)
+	
+	int threadIndex;
+	
+	for(threadIndex = 0; threadIndex < maxThreads; threadIndex++){
+	//lance tous les threads	
+	
+		if(alternator == ALT_PRODUCER && *entriesNumber > 0){
+			//mode producteur
+			
+			thread_arg t_arg;
+			if(*stdIn == 1){ 
+				//on traite toujoours stdin en premier, cela permet
+				//a l'utilisateur de ne pas attendre un thread disponible 
+				//pour les entrees via la console
+				t_arg.file = NULL;
+				t_arg.fileType =  STDIN_ENTRY;
+				t_arg.threadIndex =  threadIndex;
+				*stdIn = 0; //stdIn traite
+				*entriesNumber--;
+				printf("stdIn bien lance\n");		
+			}
+			
+			else{
+				char* file = popEntry(listOfEntries);
+				
+				if(file != NULL){					
+					if(strstr(file, URL_TK) != NULL){ //fichier URL
+						t_arg.file = NULL;
+						t_arg.fileType =  SHAREDFILE_ENTRY;
+						t_arg.threadIndex = threadIndex;
+					}
+					else {//fichier normal
+						t_arg.file = NULL;
+						t_arg.fileType = FILE_ENTRY;
+						t_arg.threadIndex = threadIndex;
+					}	
+					*entriesNumber--;
+					printf("file bien lance\n");
+				} 
+				
+				else { //erreur de popEntry
+					fprintf(stderr, "Erreur, plus de fichier a traiter\n");
+					return(-1);
+				}
+			}	
+			//lance le thread
+			if(pthread_create(&threads[threadIndex], NULL, &threadLauncher, &t_arg)){
+				fprintf(stderr, "Error creating thread: %d\n", errno);
+				return(errno);
+			}
+			//passe en mode consommateur pour le prochain thread
+			alternator = ALT_CONSUMER;
+		}	
+		else {
+			//mode consommateur
+			//lance le thread
+			if(pthread_create(&threads[threadIndex], NULL, &threadLauncher, NULL)){
+				fprintf(stderr, "Error creating thread: %d\n", errno);
+				return(errno);
+			}
+			//passe en mode producteur pour le prochain thread
+			printf("consommateur bien lance\n");
+			alternator = ALT_PRODUCER;
+		}
+	}/// fin du for qui lance tous les threads
+	return 0;
+ }
 
 /**
  * threadLauncher

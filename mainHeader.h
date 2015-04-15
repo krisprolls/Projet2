@@ -13,7 +13,6 @@ typedef struct thread_arg{
 typedef struct slotElem{
 	char* filename;
 	uint64_t number;
-	struct slotElem* next;
 } slotElem;
 
 //represente un fichier d'entree
@@ -22,6 +21,10 @@ typedef struct entry{
 	struct entry* next;
 }entry;
 
+
+/*
+ * Liste chainee d'entrees, methodes de gestion
+ */
 /**
  * pushEntry
  * Ajoute un fichier a la liste chainee d'entrees
@@ -40,6 +43,25 @@ int pushEntry(entry** list, char* file);
 char* popEntry(entry** list);
 
 
+/*
+ * Methodes pour lancer les threads (mainHelpers)
+ */ 
+
+/**
+ * launchAllThreads
+ * Cette fonction lance maxthreads threads en alternant entre producteur
+ * et consommteur
+ * @param: maxThreads, nombre max de threads a lancer
+ * @param: stdIn, pointeur vers un entier indiquant si l'entree standard
+ * est utilisee
+ * @param: entriesNumber, pointeur vers un entier indiquant le nombre
+ * d'entree restant a traiter
+ * @param: listOfEntries, pointeur vers une liste contenant les fichiers
+ * d'entree
+ * @return: 0 si pas d'erreur, valeur differente de 0 sinon
+ **/ 
+ int launchAllThreads(int maxThreads, int* stdIn, int* entriesNumber, entry** listOfEntries);
+
 /**
  * threadLauncher
  * Lance les threads en producteur ou consommateur en fonction de
@@ -50,6 +72,10 @@ char* popEntry(entry** list);
  **/ 
 void* threadLauncher(void* arg);
 
+
+/*
+ * Methodes reservees au producteur
+ */ 
 /**
  * produce
  * Appelle la methode adaptee au type de fichier pour lire le fichier

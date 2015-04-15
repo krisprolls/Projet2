@@ -2,6 +2,19 @@
  * FICHIER POUR LA DECLARATION DES FONCTIONS
  * 
  **/
+//argument a passer au lancement du thread
+typedef struct thread_arg{
+	char* file;
+	int fileType;
+	int threadIndex;
+} thread_arg;
+
+//element du buffer producer-consumer
+typedef struct slotElem{
+	char* filename;
+	uint64_t number;
+} slotElem;
+
 
 /**
  * threadLauncher

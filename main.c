@@ -11,18 +11,6 @@
 #define FILE_ENTRY 1
 #define SHAREDFILE_ENTRY 2 
 
-//argument a passer au lancement du thread
-typedef struct thread_arg{
-	char* file;
-	int fileType;
-	int threadIndex;
-} thread_arg;
-
-typedef struct slotElem{
-	char* filename;
-	uint64_t number;
-} slotElem;
-
 
 
 int main(int argc, char **argv)

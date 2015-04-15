@@ -6,7 +6,8 @@
 #include <errno.h>
 #include "header.h"
 
-
+#define ALT_PRODUCER 0
+#define ALT_CONSUMER 1
 
 int main(int argc, char **argv)
 {
@@ -33,6 +34,7 @@ int main(int argc, char **argv)
 		}
 		else if (strcmp(in, stdInTk) == 0){ //stdIn
 			stdIn = 1; // stdIn utilise
+			entriesNumber++;
 			printf("Stdin set \n");
 		}
 		else if (strcmp(in, fileTk) == 0){ //fichier
@@ -64,6 +66,12 @@ int main(int argc, char **argv)
 	
 	printf("Number of entries %d\n", entriesNumber);
 	
+	int alternator = ALT_PRODUCER;
+	//lance les threads alternativement (producteur, consommateur,
+	// producteur...)
+	while(entriesNumber > 0){
+			///TODO complete the thread launching phase here
+	}
 	
 	return 0;
 }

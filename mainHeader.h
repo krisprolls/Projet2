@@ -32,7 +32,7 @@ typedef struct entry{
  * @param: list, la liste a modifier
  * @return: 0 si ok, un autre nombre sinon (contenu dans errno)
  **/ 
-int pushEntry(entry** list, char* file);
+extern int pushEntry(entry** list, char* file);
 
 /**
  * popEntry
@@ -40,7 +40,7 @@ int pushEntry(entry** list, char* file);
  * @param:list, la liste d'entree a modifier
  * @return: l'entree qui vient d'etre enlevee a la liste, NULL si liste vide
  **/ 
-char* popEntry(entry** list);
+extern char* popEntry(entry** list);
 
 
 /*
@@ -61,7 +61,7 @@ char* popEntry(entry** list);
  * @param: threads, pointeur vers un tableau de threads
  * @return: 0 si pas d'erreur, valeur differente de 0 sinon
  **/ 
- int launchAllThreads(int maxThreads, int* stdIn, int* entriesNumber, entry** listOfEntries, pthread_t** threads);
+extern int launchAllThreads(int maxThreads, int* stdIn, int* entriesNumber, entry** listOfEntries, pthread_t** threads);
 
 /**
  * threadLauncher
@@ -71,7 +71,7 @@ char* popEntry(entry** list);
  * le fichier a lire, le type de fichier et l'indice du thread
  * @return: NULL quand le thread a termine
  **/ 
-void* threadLauncher(void* arg);
+extern void* threadLauncher(void* arg);
 
 /**
  * getFileType
@@ -79,7 +79,7 @@ void* threadLauncher(void* arg);
  * @param: file, le nom du fichier
  * @return: le nombre correspondant au type de fichier, voir les define
  **/ 
- int getFileType(char* file);
+extern int getFileType(char* file);
 
 
 /*
@@ -93,7 +93,7 @@ void* threadLauncher(void* arg);
  * @param: arg, la structure contenant, le fichier a lire, le type de 
  * fichier et l'indice du thread
  **/ 
-void produce(thread_arg* arg);
+extern void produce(thread_arg* arg);
 
 /**
  * readFile
@@ -101,11 +101,11 @@ void produce(thread_arg* arg);
  * representation locale et les place dans un slot pour etre factorises
  * @param: file, le nom du fichier a lire
  **/ 
-void readFile(char* file);
+extern void readFile(char* file);
 
 /**
  * readStdin
  * Lit les nombres passes via l'entree standard, les convertit 
  * representation locale et les place dans un slot pour etre factorises
  **/ 
-void readStdin();
+extern void readStdin();

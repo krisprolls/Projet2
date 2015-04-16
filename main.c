@@ -18,7 +18,11 @@
 #define FILE_ENTRY 1
 #define SHAREDFILE_ENTRY 2 
 
-pthread_t* threads; //threads utilises
+sem_t available_thread; // quand un producteur termine son fichier
+int available_thread_index;
+sem_t available_switching; //main a traiter les switchs de producteurs 
+
+
 
 int main(int argc, char **argv){	
 	int entriesNumber = 0;
@@ -72,19 +76,58 @@ int main(int argc, char **argv){
 	
 	printf("Number of entries %d\n", entriesNumber);
 	
-	
-	
 	if(maxThreads == 0){ /// a voir
 		maxThreads = 10;
 		printf("maxthread was 0, assigned to %d\n", maxThreads);
 	}
+	
+	//initialisation des threads et semaphores
+	pthread_t* threads; //threads utilises
 	threads = (pthread_t*) malloc(sizeof(pthread_t) * maxThreads);
+	sem_init(&available_switching, 0, 1); //switching disponible 
+	sem_init(&available_thread, 0, 0); // aucun thread n'a termine
+	available_thread_index = -1;
+	
+	
 	//lance tous les threads
-	int err = launchAllThreads(maxThreads, &stdIn, &entriesNumber, &listOfEntries);
+	int err = launchAllThreads(maxThreads, &stdIn, &entriesNumber, &listOfEntries, &threads);
 	if(err){
 		fprintf(stderr, "Erreur dans launchAllThreads: %d\n", err);
+		exit(err);
 	}
-		
+	printf("All threads launched, entries left: %d\n", entriesNumber);
+	setbuf(stdout, NULL);
+	while(entriesNumber > 0){
+		printf("Rentre ici \n");
+		sem_wait(&available_thread); // attend qu'un thread ait termine
+		//zone critique
+		printf("Zone critique\n");
+		err = pthread_join(threads[available_thread_index], NULL);
+		if(err){
+			fprintf(stderr, "Erreur dans pthread_join: %d\n", err);
+			exit(err);
+		}
+		char* file = popEntry(&listOfEntries);
+		printf("filename: %s\n", file);
+		if (file == NULL){
+			fprintf(stderr, "Erreur dans popEntry\n");
+			exit(-1);
+		}
+		thread_arg t_arg;
+		t_arg.file = file;
+		t_arg.fileType = getFileType(file);
+		t_arg.threadIndex = available_thread_index;
+		printf("switching producer number: %d , now on %s \n", available_thread_index, file);
+		err = pthread_create(&threads[available_thread_index], NULL, &threadLauncher, &t_arg);
+		if(err){
+			fprintf(stderr, "Erreur dans pthread_create: %d\n", errno);
+			exit(errno);
+		}
+		available_thread_index = -1; // pas necessaire mais plus prudent
+		entriesNumber--;
+		sem_post(&available_switching); //permet aux thread de signaler 
+		//qu'ils ont fini
+	}	
 	free(threads); //ne pas oublier !	
 	return 0;
 }
@@ -161,9 +204,10 @@ char* popEntry(entry** list){
  * d'entree restant a traiter
  * @param: listOfEntries, pointeur vers une liste contenant les fichiers
  * d'entree
+ * @param: threads, pointeur vers un tableau de threads
  * @return: 0 si pas d'erreur, valeur differente de 0 sinon
  **/ 
- int launchAllThreads(int maxThreads, int* stdIn, int* entriesNumber, entry** listOfEntries){
+ int launchAllThreads(int maxThreads, int* stdIn, int* entriesNumber, entry** listOfEntries, pthread_t** threads){
 	const int ALT_PRODUCER = 1;
 	const int ALT_CONSUMER = 0;
 	int alternator = ALT_PRODUCER;
@@ -171,7 +215,6 @@ char* popEntry(entry** list){
 	// producteur...)
 	
 	int threadIndex;
-	
 	for(threadIndex = 0; threadIndex < maxThreads; threadIndex++){
 	//lance tous les threads	
 	
@@ -184,48 +227,37 @@ char* popEntry(entry** list){
 				//a l'utilisateur de ne pas attendre un thread disponible 
 				//pour les entrees via la console
 				t_arg.file = NULL;
-				t_arg.fileType =  STDIN_ENTRY;
-				t_arg.threadIndex =  threadIndex;
 				*stdIn = 0; //stdIn traite
-				*entriesNumber--;
 				printf("stdIn bien lance\n");		
 			}
-			
 			else{
 				char* file = popEntry(listOfEntries);
-				
 				if(file != NULL){					
-					if(strstr(file, URL_TK) != NULL){ //fichier URL
-						t_arg.file = NULL;
-						t_arg.fileType =  SHAREDFILE_ENTRY;
-						t_arg.threadIndex = threadIndex;
-					}
-					else {//fichier normal
-						t_arg.file = NULL;
-						t_arg.fileType = FILE_ENTRY;
-						t_arg.threadIndex = threadIndex;
-					}	
-					*entriesNumber--;
+					t_arg.file = file;
 					printf("file bien lance\n");
 				} 
-				
-				else { //erreur de popEntry
+				else {
 					fprintf(stderr, "Erreur, plus de fichier a traiter\n");
 					return(-1);
 				}
-			}	
+			}
+				
+			t_arg.fileType = getFileType(t_arg.file);
+			t_arg.threadIndex = threadIndex;	
+					
 			//lance le thread
-			if(pthread_create(&threads[threadIndex], NULL, &threadLauncher, &t_arg)){
+			if(pthread_create(threads[threadIndex], NULL, &threadLauncher, &t_arg)){
 				fprintf(stderr, "Error creating thread: %d\n", errno);
 				return(errno);
 			}
+			(*entriesNumber)--;
 			//passe en mode consommateur pour le prochain thread
 			alternator = ALT_CONSUMER;
 		}	
 		else {
 			//mode consommateur
 			//lance le thread
-			if(pthread_create(&threads[threadIndex], NULL, &threadLauncher, NULL)){
+			if(pthread_create(threads[threadIndex], NULL, &threadLauncher, NULL)){
 				fprintf(stderr, "Error creating thread: %d\n", errno);
 				return(errno);
 			}
@@ -257,6 +289,24 @@ void* threadLauncher(void* arg){
 }
 
 /**
+ * getFileType
+ * retourne le type de fichier
+ * @param: file, le nom du fichier
+ * @return: le nombre correspondant au type de fichier, voir les define
+ **/ 
+ int getFileType(char* file){
+	 if(file == NULL){
+		return STDIN_ENTRY;
+	}
+	else if (strstr(file, URL_TK) != NULL)
+		return SHAREDFILE_ENTRY;
+	else {
+		return FILE_ENTRY;
+	}
+ }
+
+
+/**
  * produce
  * Lit le fichier passe en argument et convertit les nombres en 
  * representation locale
@@ -266,16 +316,22 @@ void* threadLauncher(void* arg){
 void produce(thread_arg* arg){
 	if(arg -> fileType == FILE_ENTRY){
 		//fichier simple
-		readFile(arg->file);
+		//readFile(arg->file);
 	}
 	else if(arg -> fileType == SHAREDFILE_ENTRY){
 		//URL de fichier
 	}
 	else { 
 		//stdin
-		readStdin();
+		//printf("STDIN type in produce, filename: %s \n", arg->file);
+		//readStdin();
 	}
-	///TODO semaphore
+	//signale que le producteur est pret a etre reutilise
+	sem_wait(&available_switching);
+	available_thread_index = arg -> threadIndex;
+	sem_post(&available_thread);
+	
+	return;
 }
 
 /**
@@ -293,7 +349,7 @@ void readFile(char* filename){
 			uint64_t bEndian;
 			fscanf(file, "%" PRIu64",", &bEndian);
 			bEndian = be64toh(bEndian);
-			slotElem tmp = {filename, bEndian};
+			//slotElem tmp = {filename, bEndian};
 			///add to slots + mutex
 			fclose(file);
 		}
@@ -306,8 +362,8 @@ void readFile(char* filename){
  * representation locale et les place dans un slot pour etre factorises
  **/ 
 void readStdin(){
-	const char* STDIN = "stdIn";
-	const char* END = "Souhaitez-vous terminer le traitement via l'entree standard? Y/N \n";
+	//const char* SOURCE = "stdIn";
+	const char* END = "Souhaitez-vous continuer le traitement via l'entree standard? Y/N \n";
 	printf("Vous avez choisi d'utiliser l'entree standard, veuillez entrer les nombres que vous desirez traiter\n");
 	printf("%s", END);
 	int end = 0;
@@ -318,7 +374,7 @@ void readStdin(){
 			uint64_t bEndian;
 			scanf("%" PRIu64",", &bEndian);
 			bEndian = be64toh(bEndian);
-			slotElem tmp = {"stdIn", bEndian};
+			//slotElem tmp = {SOURCE, bEndian};
 			///add to slots + mutex
 			printf("Nombre traite!\n");
 			printf("%s", END);

@@ -11,7 +11,7 @@ typedef struct thread_arg{
 
 //element du buffer producer-consumer
 typedef struct slotElem{
-	char* filename;
+	char* file;
 	uint64_t number;
 } slotElem;
 
@@ -58,9 +58,10 @@ char* popEntry(entry** list);
  * d'entree restant a traiter
  * @param: listOfEntries, pointeur vers une liste contenant les fichiers
  * d'entree
+ * @param: threads, pointeur vers un tableau de threads
  * @return: 0 si pas d'erreur, valeur differente de 0 sinon
  **/ 
- int launchAllThreads(int maxThreads, int* stdIn, int* entriesNumber, entry** listOfEntries);
+ int launchAllThreads(int maxThreads, int* stdIn, int* entriesNumber, entry** listOfEntries, pthread_t** threads);
 
 /**
  * threadLauncher
@@ -71,6 +72,14 @@ char* popEntry(entry** list);
  * @return: NULL quand le thread a termine
  **/ 
 void* threadLauncher(void* arg);
+
+/**
+ * getFileType
+ * retourne le type de fichier
+ * @param: file, le nom du fichier
+ * @return: le nombre correspondant au type de fichier, voir les define
+ **/ 
+ int getFileType(char* file);
 
 
 /*

@@ -96,7 +96,9 @@ int main(int argc, char **argv){
 		exit(err);
 	}
 	printf("All threads launched, entries left: %d\n", entriesNumber);
-	setbuf(stdout, NULL);
+	
+	setbuf(stdout, NULL); // stoppe le buffer
+	
 	while(entriesNumber > 0){
 		printf("Rentre ici \n");
 		sem_wait(&available_thread); // attend qu'un thread ait termine
@@ -128,8 +130,10 @@ int main(int argc, char **argv){
 		sem_post(&available_switching); //permet aux thread de signaler 
 		//qu'ils ont fini
 	}	
-	free(threads); //ne pas oublier !	
-	return 0;
+	
+	///TODO every producer to consumer
+	//free(threads); //ne pas oublier !	
+	exit(EXIT_SUCCESS);
 }
 
 /**

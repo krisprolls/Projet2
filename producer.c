@@ -7,9 +7,9 @@
 #include <inttypes.h>
 #include "producerHeader.h"
 
-const int STDIN_ENTRY = 0;
-const int FILE_ENTRY = 1;
-const int SHAREDFILE_ENTRY = 2; 
+const int STDIN_INPUT = 0;
+const int FILE_INPUT = 1;
+const int URL_INPUT = 2; 
 
 sem_t available_thread; // quand un producteur termine son fichier
 int available_thread_index;
@@ -24,11 +24,11 @@ sem_t available_switching; //main a traiter les switchs de producteurs
  * fichier et l'indice du thread
  **/ 
 void produce(thread_arg* arg){
-	if(arg -> fileType == FILE_ENTRY){
+	if(arg -> fileType == FILE_INPUT){
 		//fichier simple
 		//readFile(arg->file);
 	}
-	else if(arg -> fileType == SHAREDFILE_ENTRY){
+	else if(arg -> fileType == URL_INPUT){
 		//URL de fichier
 	}
 	else { 

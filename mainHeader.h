@@ -3,31 +3,31 @@
  * 
  **/
 //represente un fichier d'entree
-typedef struct entry{
+typedef struct input{
 	char* file;
-	struct entry* next;
-}entry;
+	struct input* next;
+}input;
 
 
 /*
  * Liste chainee d'entrees, methodes de gestion
  */
 /**
- * pushEntry
+ * pushInput
  * Ajoute un fichier a la liste chainee d'entrees
  * @param: file, le fichier a ajouter
  * @param: list, la liste a modifier
  * @return: 0 si ok, un autre nombre sinon (contenu dans errno)
  **/ 
-extern int pushEntry(entry** list, char* file);
+extern int pushInput(input** list, char* file);
 
 /**
- * popEntry
+ * popInput
  * retourne la premiere entree contenue dans list
  * @param:list, la liste d'entree a modifier
  * @return: l'entree qui vient d'etre enlevee a la liste, NULL si liste vide
  **/ 
-extern char* popEntry(entry** list);
+extern char* popInput(input** list);
 
 
 /*
@@ -41,14 +41,14 @@ extern char* popEntry(entry** list);
  * @param: maxThreads, nombre max de threads a lancer
  * @param: stdIn, pointeur vers un entier indiquant si l'entree standard
  * est utilisee
- * @param: entriesNumber, pointeur vers un entier indiquant le nombre
+ * @param: inputsNumber, pointeur vers un entier indiquant le nombre
  * d'entree restant a traiter
- * @param: listOfEntries, pointeur vers une liste contenant les fichiers
+ * @param: listOfInputs, pointeur vers une liste contenant les fichiers
  * d'entree
  * @param: threads, pointeur vers un tableau de threads
  * @return: 0 si pas d'erreur, valeur differente de 0 sinon
  **/ 
-extern int launchAllThreads(int maxThreads, int* stdIn, int* entriesNumber, entry** listOfEntries, pthread_t** threads);
+extern int launchAllThreads(int maxThreads, int* stdIn, int* inputsNumber, input** listOfInputs, pthread_t** threads);
 
 /**
  * threadLauncher

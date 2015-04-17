@@ -16,18 +16,18 @@
 #define FILE_TK "file"
 #define URL_TK  "http://"
 
-extern const int STDIN_ENTRY;
-extern const int FILE_ENTRY;
-extern const int SHAREDFILE_ENTRY;
+extern const int STDIN_INPUT;
+extern const int FILE_INPUT;
+extern const int URL_INPUT;
 extern sem_t available_thread; // quand un producteur termine son fichier
 extern int available_thread_index;
 extern sem_t available_switching; //main a traiter les switchs de producteurs 
 
 
 int main(int argc, char **argv){	
-	int entriesNumber = 0;
+	int inputsNumber = 0;
 	int stdIn = 0;//stdIn pas utilise
-	entry* listOfEntries = NULL;// liste des entrees a traiter
+	input* listOfInputs = NULL;// liste des entrees a traiter
 	int maxThreads = 0;
 	
 	
@@ -44,28 +44,28 @@ int main(int argc, char **argv){
 		}
 		else if (strcmp(in, STDIN_TK) == 0){ //stdIn
 			stdIn = 1; // stdIn utilise
-			entriesNumber++;
+			inputsNumber++;
 			printf("Stdin set \n");
 		}
 		else if (strcmp(in, FILE_TK) == 0){ //fichier
-			if(pushEntry(&listOfEntries, argv[i+1]) != 0){
+			if(pushInput(&listOfInputs, argv[i+1]) != 0){
 				//probleme de malloc, arrete le programme
 				exit(errno);
 			}
 			else{
-				printf("Added %s to entries\n", argv[i+1]);
+				printf("Added %s to inputs\n", argv[i+1]);
 				i++;
-				entriesNumber++;
+				inputsNumber++;
 			}
 		}
 		else if(strstr(in, URL_TK) != NULL){ //URL
-			if(pushEntry(&listOfEntries, argv[i]) != 0){
+			if(pushInput(&listOfInputs, argv[i]) != 0){
 				//probleme de malloc, arrete le programme
 				exit(errno);
 			}
 			else{
-				printf("Added %s to entries\n", argv[i]);
-				entriesNumber++;
+				printf("Added %s to inputs\n", argv[i]);
+				inputsNumber++;
 			}
 		}
 		else{ //erreur de format
@@ -74,7 +74,7 @@ int main(int argc, char **argv){
 		}
 	}
 	
-	printf("Number of entries %d\n", entriesNumber);
+	printf("Number of inputs %d\n", inputsNumber);
 	
 	if(maxThreads == 0){ /// a voir
 		maxThreads = 10;
@@ -90,16 +90,16 @@ int main(int argc, char **argv){
 	
 	
 	//lance tous les threads
-	int err = launchAllThreads(maxThreads, &stdIn, &entriesNumber, &listOfEntries, &threads);
+	int err = launchAllThreads(maxThreads, &stdIn, &inputsNumber, &listOfInputs, &threads);
 	if(err){
 		fprintf(stderr, "Erreur dans launchAllThreads: %d\n", err);
 		exit(err);
 	}
-	printf("All threads launched, entries left: %d\n", entriesNumber);
+	printf("All threads launched, inputs left: %d\n", inputsNumber);
 	
 	setbuf(stdout, NULL); // stoppe le buffer
 	
-	while(entriesNumber > 0){
+	while(inputsNumber > 0){
 		printf("Rentre ici \n");
 		sem_wait(&available_thread); // attend qu'un thread ait termine
 		//zone critique
@@ -109,10 +109,10 @@ int main(int argc, char **argv){
 			fprintf(stderr, "Erreur dans pthread_join: %d\n", err);
 			exit(err);
 		}
-		char* file = popEntry(&listOfEntries);
+		char* file = popInput(&listOfInputs);
 		printf("filename: %s\n", file);
 		if (file == NULL){
-			fprintf(stderr, "Erreur dans popEntry\n");
+			fprintf(stderr, "Erreur dans popInput\n");
 			exit(-1);
 		}
 		thread_arg t_arg;
@@ -126,7 +126,7 @@ int main(int argc, char **argv){
 			exit(errno);
 		}
 		available_thread_index = -1; // pas necessaire mais plus prudent
-		entriesNumber--;
+		inputsNumber--;
 		sem_post(&available_switching); //permet aux thread de signaler 
 		//qu'ils ont fini
 	}	
@@ -137,15 +137,15 @@ int main(int argc, char **argv){
 }
 
 /**
- * pushEntry
+ * pushInput
  * Ajoute un fichier a la liste chainee d'entrees
  * @param: file, le fichier a ajouter
  * @param: list, la liste a modifier
  * @return: 0 si ok, un autre nombre sinon (contenu dans errno)
  **/ 
-int pushEntry(entry** list, char* file){
+int pushInput(input** list, char* file){
 	if(*list == NULL){
-		*list = (entry*) malloc(sizeof(entry));
+		*list = (input*) malloc(sizeof(input));
 		if (*list != NULL){
 			(*list) -> file = file;
 			(*list) -> next = NULL;
@@ -156,11 +156,11 @@ int pushEntry(entry** list, char* file){
 		}
 	}
 	else {
-		entry* tmp = *list;
+		input* tmp = *list;
 		while(tmp -> next != NULL){
 			tmp = tmp -> next;
 		}
-		tmp -> next = (entry*) malloc (sizeof(entry));
+		tmp -> next = (input*) malloc (sizeof(input));
 		if ((tmp -> next) != NULL){
 			(tmp -> next) -> file = file;
 			(tmp -> next) -> next = NULL;
@@ -175,18 +175,18 @@ int pushEntry(entry** list, char* file){
 }
 
 /**
- * popEntry
+ * popInput
  * retourne la premiere entree contenue dans list
  * @param:list, la liste d'entree a modifier
  * @return: l'entree qui vient d'etre enlevee a la liste, NULL si liste vide
  **/ 
-char* popEntry(entry** list){
+char* popInput(input** list){
 	if (*list == NULL){
 		fprintf(stderr, "Liste vide! \n");
 		return NULL;
 	}
 	else{
-		entry* tmp = *list;
+		input* tmp = *list;
 		*list = (*list) -> next;
 		char* retVal = tmp -> file;
 		free(tmp);
@@ -204,14 +204,14 @@ char* popEntry(entry** list){
  * @param: maxThreads, nombre max de threads a lancer
  * @param: stdIn, pointeur vers un entier indiquant si l'entree standard
  * est utilisee
- * @param: entriesNumber, pointeur vers un entier indiquant le nombre
+ * @param: inputsNumber, pointeur vers un entier indiquant le nombre
  * d'entree restant a traiter
- * @param: listOfEntries, pointeur vers une liste contenant les fichiers
+ * @param: listOfInputs, pointeur vers une liste contenant les fichiers
  * d'entree
  * @param: threads, pointeur vers un tableau de threads
  * @return: 0 si pas d'erreur, valeur differente de 0 sinon
  **/ 
- int launchAllThreads(int maxThreads, int* stdIn, int* entriesNumber, entry** listOfEntries, pthread_t** threads){
+ int launchAllThreads(int maxThreads, int* stdIn, int* inputsNumber, input** listOfInputs, pthread_t** threads){
 	const int ALT_PRODUCER = 1;
 	const int ALT_CONSUMER = 0;
 	int alternator = ALT_PRODUCER;
@@ -222,7 +222,7 @@ char* popEntry(entry** list){
 	for(threadIndex = 0; threadIndex < maxThreads; threadIndex++){
 	//lance tous les threads	
 	
-		if(alternator == ALT_PRODUCER && *entriesNumber > 0){
+		if(alternator == ALT_PRODUCER && *inputsNumber > 0){
 			//mode producteur
 			
 			thread_arg t_arg;
@@ -235,7 +235,7 @@ char* popEntry(entry** list){
 				printf("stdIn bien lance\n");		
 			}
 			else{
-				char* file = popEntry(listOfEntries);
+				char* file = popInput(listOfInputs);
 				if(file != NULL){					
 					t_arg.file = file;
 					printf("file bien lance\n");
@@ -254,7 +254,7 @@ char* popEntry(entry** list){
 				fprintf(stderr, "Error creating thread: %d\n", errno);
 				return(errno);
 			}
-			(*entriesNumber)--;
+			(*inputsNumber)--;
 			//passe en mode consommateur pour le prochain thread
 			alternator = ALT_CONSUMER;
 		}	
@@ -300,12 +300,12 @@ void* threadLauncher(void* arg){
  **/ 
  int getFileType(char* file){
 	 if(file == NULL){
-		return STDIN_ENTRY;
+		return STDIN_INPUT;
 	}
 	else if (strstr(file, URL_TK) != NULL)
-		return SHAREDFILE_ENTRY;
+		return URL_INPUT;
 	else {
-		return FILE_ENTRY;
+		return FILE_INPUT;
 	}
  }
 

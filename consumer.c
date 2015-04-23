@@ -4,12 +4,21 @@
 //#include <header.h>
 
 
-// Structure qui represente une liste simplement chainee d'entiers. Elle servira de tableau dynamique.
+// Structure qui aide a representer une liste simplement chainee d'entiers. Elle servira de tableau dynamique.
 typedef struct factor{
 	int elem;
 	char * origin_file;
 	struct factor * next;
 }factor;
+
+
+// Structure qui represente un facteur a inserer dans la liste finale. Elle contient le nombre d'occurrences du facteur en plus.
+typedef struct global_factor{
+	int elem;
+	char * origin_file;
+	struct global_factor * next;
+	int occurr;
+}global_factor;
 
 
 
@@ -56,24 +65,6 @@ int add(int new_int, char * filename, factor *array)
 		current -> next = element;		//Insertion de l'element
 		return 0;
 }
-
-
-/**
- * Ajoute une liste de facteurs dans une autre,
- * dans l'ordre d'occurence, en suivant un tri
- * par insertion.
- * 
- * @new_int : facteur a ajouter
- * @filename : nom du fichier dans lequel se trouvait le nombre factorise
- * (si entree standard : filename = "stdin", si URL : filename = "<URL a lire>")
- * @return : 0 si ajouté, 1 si erreur (liste vide)
- * 
- */
-int insert(factor * list)
-{
-	
-}
-
 
 
 /**
@@ -203,11 +194,63 @@ factor * prime_fact(int number, char * filename)
 
 
 
+
 /**********************************
 ***		Fonctions inherentes	***
 ***		au consommateur			***
 ***********************************/
 
+
+
+/**
+ * Ajoute une liste de facteurs dans une liste de facteurs
+ * globaux en suivant un tri par insertion selon l'occurrence
+ * de chaque facteur global.
+ * 
+ * @list : liste de facteurs que l'on va inserer dans 'global'
+ * @global : liste de global_factor dans laquelle est inseree 'list'
+ * @return : 0 si ajouté, 1 si erreur (liste vide)
+ * 
+ */
+int insert(global_factor ** global, int list_length, factor * list)
+{
+	
+	if(global == NULL){
+		return 1;
+	}
+	else if(list == NULL){
+		return 1;
+	}
+	
+	int i;
+	for(i=0;i<list_length;i++){
+		factor * current = list;	// Pointeur pour selectionner un element de 'list'
+		int count = 0;	// compteur de la position jusqu'a l'indice i
+		while(current -> next != NULL && count < i){	// Selection du facteur a l'indice i dans 'list'
+			current = current -> next;
+			count++;
+		}
+		
+		global_factor * current_global = &global;	// Facteur traversant la liste globale
+		int stop = 0;	// Boucle s'arrete si le facteur courant existe deja dans la liste globale
+		while(current_global -> next != NULL && stop == 0){
+			if(current_global -> elem == current -> elem){
+				(current_global -> occurr)++;	// Incrementation de l'occurrence de ce facteur
+				stop = 1;
+			}
+		}
+		
+		// Insertion en tete de liste avec occurrence de 1
+		global_factor * new_fact = malloc(sizeof(global_factor));
+		new_fact -> elem = current -> elem;
+		new_fact -> occurr = 1;
+		new_fact -> origin_file = current -> origin_file;
+		new_fact -> next = global;
+		global = new;
+	}
+	return 0;
+}
+		
 
 
 
@@ -230,29 +273,54 @@ int consumer(void)
 		return 1;
 	}
 	
-	if(list == NULL){	// Liste de facteurs partagee entre les consommateurs, consideree comme variable globale
-		// create_new_list();
+	if(global_list == NULL){	// Liste de facteurs partagee entre les consommateurs, consideree comme variable globale
 		return 0;
 	}
 	
-	factor * fac_list = malloc(sizeof(factor));	// Liste de facteurs dans laquelle on stock la factorisation des nombres du buffer;
+	factor * fac_list = malloc(sizeof(factor));	// Liste intermediaire de facteurs dans laquelle on stock la factorisation des nombres du buffer;
 												// Cette liste sera ensuite ajoutee a la liste chainee globale.
-												
+	
+	
+	
+	sem_wait(&full);	// Attente qu'au moins un slot du buffer partage est disponible
+	
+	if(pthread_mutex_lock(mutex_buff)!=0){
+		printf("Erreur mutex_lock\n");
+		return 1;
+	}
+	
 	int i;		// Parcours du buffer puis factorisation de chaque nombre parcouru
 	for(i=0;i<buffer_size;i++){
 		if((buffer[i] -> treated) == 0){		/// Check structure
-			factor * factorized = prime_fact(buffer[i] -> number, buffer[i] ->  origin_file);	/// Check / Factorisation
-			if(
+			fac_list = prime_fact(buffer[i] -> number, buffer[i] ->  origin_file);	// Factorisation
 		}
 	}
 	
+	if(pthread_mutex_unlock(mutex_buff)!=0){
+		printf("Erreur mutex_unlock\n");
+		return 1;
+	}
+	
+	sem_post(&empty);	// Un slot du buffer a ete consomme et est libere
+	
+	
 	// Insertion de la liste de facteurs intermediaire dans la liste globale
-	if(insert(fac_list) == 1){
+	if(pthread_mutex_lock(mutex_conso)!=0){
+		printf("Erreur mutex_lock\n");
+		return 1;
+	}
+	
+	if(insert(&global_list, fac_list) == 1){
 		printf("Erreur lors de l'insertion des facteurs dans la liste globale\n");
 		printf("\n");
 	}
-}
+	
+	if(pthread_mutex_unlock(mutex_conso)!=0){
+		printf("Erreur mutex_unlock\n");
+		return 1;
+	}
 
+}
 
 
 

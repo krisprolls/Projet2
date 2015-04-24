@@ -169,15 +169,7 @@ factor * prime_fact(int number, char * filename)
 					printf("\n");
 					return NULL;
 				}
-				/*
-				factor * curr = factors;
-				int j;
-				for(j=0;j<global_length+1;j++){		/// Simple verification de l'etat de la liste, je virerai ça plus tard
-					printf("curr2.elem = %d\n", curr->elem);
-					curr = curr->next;
-				}
-				printf("\n");
-				*/
+
 			}
 			else{
 				div = next_prime(div);	// current_number pas divisible par div, on prend le prochain nombre premier
@@ -282,10 +274,10 @@ int consumer(void)
 	
 	
 	
-	sem_wait(&full);	// Attente qu'au moins un slot du buffer partage est disponible
+	sem_wait(&full);	// Attend qu'au moins un slot du buffer partage soit disponible
 	
 	if(pthread_mutex_lock(mutex_buff)!=0){
-		printf("Erreur mutex_lock\n");
+		printf("Erreur mutex_lock du buffer\n");
 		return 1;
 	}
 	
@@ -297,7 +289,7 @@ int consumer(void)
 	}
 	
 	if(pthread_mutex_unlock(mutex_buff)!=0){
-		printf("Erreur mutex_unlock\n");
+		printf("Erreur mutex_unlock buffer\n");
 		return 1;
 	}
 	
@@ -306,7 +298,7 @@ int consumer(void)
 	
 	// Insertion de la liste de facteurs intermediaire dans la liste globale
 	if(pthread_mutex_lock(mutex_conso)!=0){
-		printf("Erreur mutex_lock\n");
+		printf("Erreur mutex_lock de la liste globale\n");
 		return 1;
 	}
 	
@@ -316,7 +308,7 @@ int consumer(void)
 	}
 	
 	if(pthread_mutex_unlock(mutex_conso)!=0){
-		printf("Erreur mutex_unlock\n");
+		printf("Erreur mutex_unlock de la liste globale\n");
 		return 1;
 	}
 
